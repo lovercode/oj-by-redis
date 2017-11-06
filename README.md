@@ -10,16 +10,16 @@ oj-by-redis是遵从GPL协议的软件
     	"solution":	{
     		"time":	0,
     		"judger":	"user",
-    		"pass_rate":	0.8,                 //通过率
-    		"language":	0,                       //语言
+    		"pass_rate":	0.8,                  //通过率
+    		"language":	0,                     //语言
     		"result":	0,                       //结果code
     		"memory":	0,                       //耗费的内存
     		"user_id":	"user",                  
     		"problem_id":	14954345,           
-    		"solution_id":	12345                 //与redis的key一样
+    		"solution_id":	12345               //与redis的key一样
     	},
     	"source_code":	{
-    		"source":	"#include <stdio.h>"      //源码
+    		"source":	"#include <stdio.h>"     //源码
     	},
     	"runtimeinfo":	{
     		"error":	"error"                   //运行结果
@@ -32,7 +32,7 @@ oj-by-redis是遵从GPL协议的软件
     		"title":	"title",
     		"spj":	"a",
     		"time_limit":	1,                    //运行时间限制
-    		"memory_limit":	1                     //运行内存限制
+    		"memory_limit":	1                   //运行内存限制
     	}
     }
 
@@ -48,9 +48,13 @@ oj-by-redis是遵从GPL协议的软件
 
 
 ### 修改
-    judge.conf中添加的内容，是针对客户端的设置，原以为守护进程不支持redis的，结果发现守护进程读取任务是支持的，那么就减少很多工作了，只需对判题客户端进行修改，不过也对守护进程进行了修改
-    1, 守护进程(judged)的初始化数据库操作，做了个判断，如果守护进程以redis运行，那么就不会与mysql进行连接
-    2，判题客户端(judge_client)添加了对redis的支持，主要是数据的读入和返回，如果客户端以redis运行，也不会连接数据库，具体的数据参照上面的数据结构
+    judge.conf中添加的内容，是针对客户端的设置，原以为守护进程不支持redis的，
+    结果发现守护进程读取任务是支持的，那么就减少很多工作了，只需对判题客户端进
+    行修改，不过也对守护进程进行了修改
+    1, 守护进程(judged)的初始化数据库操作，做了个判断，
+        如果守护进程以redis运行，那么就不会与mysql进行连接
+    2，判题客户端(judge_client)添加了对redis的支持，主要是数据的读入和返回，
+        如果客户端以redis运行，也不会连接数据库，具体的数据参照上面的数据结构
 
 ### 使用方法
     其他程序（web或者其他）添加数json数据到redis，假设key为sulution_id，
