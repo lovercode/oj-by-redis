@@ -73,7 +73,7 @@ oj-by-redis是遵从GPL协议的软件
     上面的数据结构，然后编译。结果在result中，与hustoj基本一致，编译错误或运行结果
     在runtimeinfo.error或者compileinfo.error中
 
-### 安装
+### 安装(安装之前请先安装hustoj，再执行下面代码)
     cp judge.conf /home/judge/etc
     cd hustoj-read-only/core
     cd judged
