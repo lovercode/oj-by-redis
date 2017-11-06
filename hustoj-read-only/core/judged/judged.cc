@@ -246,25 +246,25 @@ int executesql(const char * sql) {
 }
 
 int init_mysql() {
-	// if (conn == NULL) {
-	// 	conn = mysql_init(NULL);		// init the database connection
-	// 	/* connect the database */
-	// 	const char timeout = 30;
-	// 	mysql_options(conn, MYSQL_OPT_CONNECT_TIMEOUT, &timeout);
-    //
-	// 	if (!mysql_real_connect(conn, host_name, user_name, password, db_name,
-	// 			port_number, 0, 0)) {
-	// 		if (DEBUG)
-	// 			write_log("%s", mysql_error(conn));
-	// 		sleep(2);
-	// 		return 1;
-	// 	} else {
-	// 		return 0;
-	// 	}
-	// } else {
-	// 	return executesql("set names utf8");
-	// }
-    return 0;
+	if (conn == NULL) {
+		conn = mysql_init(NULL);		// init the database connection
+		/* connect the database */
+		const char timeout = 30;
+		mysql_options(conn, MYSQL_OPT_CONNECT_TIMEOUT, &timeout);
+
+		if (!mysql_real_connect(conn, host_name, user_name, password, db_name,
+				port_number, 0, 0)) {
+			if (DEBUG)
+				write_log("%s", mysql_error(conn));
+			sleep(2);
+			return 1;
+		} else {
+			return 0;
+		}
+	} else {
+		return executesql("set names utf8");
+	}
+    // return 0;
 }
 FILE * read_cmd_output(const char * fmt, ...) {
 	char cmd[BUFFER_SIZE];

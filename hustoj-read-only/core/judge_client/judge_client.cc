@@ -119,6 +119,7 @@ static int shm_run = 0;
 //对redis支持
 static redisContext* oj_rediscli;
 static int  oj_redis = 0;
+static int  oj_keeplive = -1;
 static char oj_redisserver[BUFFER_SIZE];
 static int  oj_redisport;
 static char oj_redisauth[BUFFER_SIZE];
@@ -334,6 +335,7 @@ void init_mysql_conf() {
             read_int(buf, "OJ_CLI_REDISPORT", &oj_redisport);
             read_buf(buf, "OJ_CLI_REDISAUTH", oj_redisauth);
             read_buf(buf, "OJ_CLI_REDISQNAME", oj_redisqname);
+            read_int(buf, "OJ_CLI_KEEPLIVE", &oj_keeplive);
 		}
 		//fclose(fp);
 	}
@@ -626,14 +628,26 @@ void _update_solution_http(int solution_id, int result, int time, int memory,
 	//fscanf(fjobs,"%d",&ret);
 	pclose(fjobs);
 }
+//redis_code
 void _update_solution_redis(int solution_id, int result, int time, int memory,
 		int sim, int sim_s_id, double pass_rate) {
-	// const char * cmd =
-	// 		" wget --post-data=\"update_solution=1&sid=%d&result=%d&time=%d&memory=%d&sim=%d&simid=%d&pass_rate=%f\" --load-cookies=cookie --save-cookies=cookie --keep-session-cookies -q -O - \"%s/admin/problem_judge.php\"";
-	// FILE * fjobs = read_cmd_output(cmd, solution_id, result, time, memory, sim,
-	// 		sim_s_id, pass_rate, http_baseurl);
-	// //fscanf(fjobs,"%d",&ret);
-	// pclose(fjobs);
+    redisReply* res = (redisReply*)redisCommand(oj_rediscli, "get %d", solution_id);
+
+    cJSON* root, *solution;
+    root = cJSON_Parse(res->str);
+    solution = cJSON_GetObjectItem(root, "solution");
+    cJSON_SetIntValue(cJSON_GetObjectItem(solution, "time"), time);
+    cJSON_SetIntValue(cJSON_GetObjectItem(solution, "result"), result);
+    cJSON_SetIntValue(cJSON_GetObjectItem(solution, "memory"), memory);
+    // cJSON_SetNumberValue(cJSON_GetObjectItem(solution, "pass_rate"), number)
+    cJSON_GetObjectItem(solution, "pass_rate")->valuedouble = pass_rate;
+    // cJSON_SetIntValue(cJSON_GetObjectItem(solution, "pass_rate"), pass_rate);
+    strcpy(cJSON_GetObjectItem(solution, "judger")->valuestring, http_username);
+    redisCommand(oj_rediscli, "set %d %s", solution_id ,cJSON_PrintUnformatted(root));
+    cJSON_Delete(root);
+    // printf("更新数据\n");
+
+
 }
 void update_solution(int solution_id, int result, int time, int memory, int sim,
 		int sim_s_id, double pass_rate) {
@@ -715,36 +729,30 @@ char *url_encode(char *str) {
 	*pbuf = '\0';
 	return buf;
 }
+//redis_code
 void _addceinfo_redis(int solution_id) {
+
 	// char sql[(1 << 16)], *end;
-	// char ceinfo[(1 << 16)], *cend;
-	// FILE *fp = fopen("ce.txt", "re");
-	// snprintf(sql, (1 << 16) - 1, "DELETE FROM compileinfo WHERE solution_id=%d",
-	// 		solution_id);
-	// mysql_real_query(conn, sql, strlen(sql));
-	// cend = ceinfo;
-	// while (fgets(cend, 1024, fp)) {
-	// 	cend += strlen(cend);
-	// 	if (cend - ceinfo > 40000)
-	// 		break;
-	// }
-	// cend = 0;
-	// end = sql;
-	// strcpy(end, "INSERT INTO compileinfo VALUES(");
-	// end += strlen(sql);
-	// *end++ = '\'';
-	// end += sprintf(end, "%d", solution_id);
-	// *end++ = '\'';
-	// *end++ = ',';
-	// *end++ = '\'';
-	// end += mysql_real_escape_string(conn, end, ceinfo, strlen(ceinfo));
-	// *end++ = '\'';
-	// *end++ = ')';
-	// *end = 0;
-	// //      printf("%s\n",ceinfo);
-	// if (mysql_real_query(conn, sql, end - sql))
-	// 	printf("%s\n", mysql_error(conn));
-	// fclose(fp);
+	char ceinfo[(1 << 16)], *cend;
+	FILE *fp = fopen("ce.txt", "re");
+
+	cend = ceinfo;
+	while (fgets(cend, 1024, fp)) {
+		cend += strlen(cend);
+		if (cend - ceinfo > 40000)
+			break;
+	}
+    cend = 0;
+    printf("结果%s\n", ceinfo);
+    redisReply* res = (redisReply*)redisCommand(oj_rediscli, "get %d", solution_id);
+    cJSON* root, *compileinfo;
+    root = cJSON_Parse(res->str);
+    compileinfo = cJSON_GetObjectItem(root, "compileinfo");
+    strcpy(cJSON_GetObjectItem(compileinfo, "error")->valuestring, ceinfo);
+    redisCommand(oj_rediscli, "set %d %s", solution_id ,cJSON_PrintUnformatted(root));
+    cJSON_Delete(root);
+
+	fclose(fp);
 }
 void _addceinfo_http(int solution_id) {
 
@@ -786,12 +794,12 @@ void addceinfo(int solution_id) {
 }
 /* write runtime error message back to database */
 void _addreinfo_mysql(int solution_id, const char * filename) {
-	// char sql[(1 << 16)]/*, *end*/;
+    char sql[(1 << 16)], *end;
 	char reinfo[(1 << 16)], *rend;
 	FILE *fp = fopen(filename, "re");
-	// snprintf(sql, (1 << 16) - 1, "DELETE FROM runtimeinfo WHERE solution_id=%d",
-	// 		solution_id);
-	// mysql_real_query(conn, sql, strlen(sql));
+	snprintf(sql, (1 << 16) - 1, "DELETE FROM runtimeinfo WHERE solution_id=%d",
+			solution_id);
+	mysql_real_query(conn, sql, strlen(sql));
 	rend = reinfo;
 	while (fgets(rend, 1024, fp)) {
 		rend += strlen(rend);
@@ -799,64 +807,48 @@ void _addreinfo_mysql(int solution_id, const char * filename) {
 			break;
 	}
 	rend = 0;
-	// end = sql;
-
-    redisContext* redis = redisConnect("127.0.0.1", 6379);
-    redisCommand(redis, "set %d %s", solution_id, reinfo);
-    redisCommand(redis, "EXPIRE %d 10", solution_id);
-    redisFree(redis);
-    // strcpy(end, "INSERT INTO runtimeinfo VALUES(");
-	// end += strlen(sql);
-	// *end++ = '\'';
-	// end += sprintf(end, "%d", solution_id);
-	// *end++ = '\'';
-	// *end++ = ',';
-	// *end++ = '\'';
-	// end += mysql_real_escape_string(conn, end, reinfo, strlen(reinfo));
-	// *end++ = '\'';
-	// *end++ = ')';
-	// *end = 0;
-	// //      printf("%s\n",ceinfo);
-	// if (mysql_real_query(conn, sql, end - sql))
-	// 	printf("%s\n", mysql_error(conn));
+	end = sql;
+	strcpy(end, "INSERT INTO runtimeinfo VALUES(");
+	end += strlen(sql);
+	*end++ = '\'';
+	end += sprintf(end, "%d", solution_id);
+	*end++ = '\'';
+	*end++ = ',';
+	*end++ = '\'';
+	end += mysql_real_escape_string(conn, end, reinfo, strlen(reinfo));
+	*end++ = '\'';
+	*end++ = ')';
+	*end = 0;
+	//      printf("%s\n",ceinfo);
+	if (mysql_real_query(conn, sql, end - sql))
+		printf("%s\n", mysql_error(conn));
 	fclose(fp);
-}
 
+
+}
+//redis_code
 void _addreinfo_redis(int solution_id, const char * filename) {
-	// char sql[(1 << 16)]/*, *end*/;
-	// char reinfo[(1 << 16)], *rend;
-	// FILE *fp = fopen(filename, "re");
-	// // snprintf(sql, (1 << 16) - 1, "DELETE FROM runtimeinfo WHERE solution_id=%d",
-	// // 		solution_id);
-	// // mysql_real_query(conn, sql, strlen(sql));
-	// rend = reinfo;
-	// while (fgets(rend, 1024, fp)) {
-	// 	rend += strlen(rend);
-	// 	if (rend - reinfo > 40000)
-	// 		break;
-	// }
-	// rend = 0;
-	// // end = sql;
-    //
-    // redisContext* redis = redisConnect("127.0.0.1", 6379);
-    // redisCommand(redis, "set %d %s", solution_id, reinfo);
-    // redisCommand(redis, "EXPIRE %d 10", solution_id);
-    // redisFree(redis);
-    // // strcpy(end, "INSERT INTO runtimeinfo VALUES(");
-	// // end += strlen(sql);
-	// // *end++ = '\'';
-	// // end += sprintf(end, "%d", solution_id);
-	// // *end++ = '\'';
-	// // *end++ = ',';
-	// // *end++ = '\'';
-	// // end += mysql_real_escape_string(conn, end, reinfo, strlen(reinfo));
-	// // *end++ = '\'';
-	// // *end++ = ')';
-	// // *end = 0;
-	// // //      printf("%s\n",ceinfo);
-	// // if (mysql_real_query(conn, sql, end - sql))
-	// // 	printf("%s\n", mysql_error(conn));
-	// fclose(fp);
+
+	char reinfo[(1 << 16)], *rend;
+	FILE *fp = fopen(filename, "re");
+
+	rend = reinfo;
+	while (fgets(rend, 1024, fp)) {
+		rend += strlen(rend);
+		if (rend - reinfo > 40000)
+			break;
+	}
+	rend = 0;
+    printf("结果%s\n", reinfo);
+    redisReply* res = (redisReply*)redisCommand(oj_rediscli, "get %d", solution_id);
+    cJSON* root, *runtimeinfo;
+    root = cJSON_Parse(res->str);
+    runtimeinfo = cJSON_GetObjectItem(root, "runtimeinfo");
+    strcpy(cJSON_GetObjectItem(runtimeinfo, "error")->valuestring, reinfo);
+    redisCommand(oj_rediscli, "set %d %s", solution_id ,cJSON_PrintUnformatted(root));
+    cJSON_Delete(root);
+
+	fclose(fp);
 }
 
 void _addreinfo_http(int solution_id, const char * filename) {
@@ -946,8 +938,9 @@ void _update_user_http(char * user_id) {
 	//fscanf(fjobs,"%d",&ret);
 	pclose(fjobs);
 }
-
+//redis_code
 void _update_user_redis(char * user_id) {
+
 	// char sql[BUFFER_SIZE];
 	// sprintf(sql,
 	// 		"UPDATE `users` SET `solved`=(SELECT count(DISTINCT `problem_id`) FROM `solution` WHERE `user_id`=\'%s\' AND `result`=\'4\') WHERE `user_id`=\'%s\'",
@@ -993,6 +986,7 @@ void _update_problem_mysql(int p_id) {
 	if (mysql_real_query(conn, sql, strlen(sql)))
 		write_log(mysql_error(conn));
 }
+//redis_code
 void _update_problem_redis(int p_id) {
 	// char sql[BUFFER_SIZE];
 	// sprintf(sql,
@@ -1274,25 +1268,23 @@ void _get_solution_http(int solution_id, char * work_dir, int lang) {
 	pclose(pout);
 
 }
+//redis_code
 void _get_solution_redis(int solution_id, char * work_dir, int lang) {
-	// char sql[BUFFER_SIZE], src_pth[BUFFER_SIZE];
-	// // get the source code
-	// MYSQL_RES *res;
-	// MYSQL_ROW row;
-	// sprintf(sql, "SELECT source FROM source_code WHERE solution_id=%d",
-	// 		solution_id);
-	// mysql_real_query(conn, sql, strlen(sql));
-	// res = mysql_store_result(conn);
-	// row = mysql_fetch_row(res);
-    //
-	// // create the src file
-	// sprintf(src_pth, "Main.%s", lang_ext[lang]);
-	// if (DEBUG)
-	// 	printf("Main=%s", src_pth);
-	// FILE *fp_src = fopen(src_pth, "we");
-	// fprintf(fp_src, "%s", row[0]);
-	// mysql_free_result(res);
-	// fclose(fp_src);
+	char src_pth[BUFFER_SIZE];
+
+    redisReply* res = (redisReply*)redisCommand(oj_rediscli, "get %d", solution_id);
+    cJSON* root, *source_code;
+    root = cJSON_Parse(res->str);
+    source_code = cJSON_GetObjectItem(root, "source_code");
+
+	sprintf(src_pth, "Main.%s", lang_ext[lang]);
+	if (DEBUG)
+		printf("Main=%s", src_pth);
+	FILE *fp_src = fopen(src_pth, "we");
+	fprintf(fp_src, "%s", cJSON_GetObjectItem(source_code, "source")->valuestring);
+
+	fclose(fp_src);
+    cJSON_Delete(root);
 }
 void get_solution(int solution_id, char * work_dir, int lang) {
 	if (http_judge) {
@@ -1344,26 +1336,30 @@ void _get_custominput_http(int solution_id, char * work_dir) {
 	pclose(pout);
 
 }
+//redis_code
 void _get_custominput_redis(int solution_id, char * work_dir) {
-	// char sql[BUFFER_SIZE], src_pth[BUFFER_SIZE];
+	// char /*sql[BUFFER_SIZE], */src_pth[BUFFER_SIZE];
 	// // get the source code
-	// MYSQL_RES *res;
-	// MYSQL_ROW row;
-	// sprintf(sql, "SELECT input_text FROM custominput WHERE solution_id=%d",
-	// 		solution_id);
-	// mysql_real_query(conn, sql, strlen(sql));
-	// res = mysql_store_result(conn);
-	// row = mysql_fetch_row(res);
-	// if (row != NULL) {
-    //
+	// // MYSQL_RES *res;
+	// // MYSQL_ROW row;
+	// // sprintf(sql, "SELECT input_text FROM custominput WHERE solution_id=%d",
+	// // 		solution_id);
+	// // mysql_real_query(conn, sql, strlen(sql));
+	// // res = mysql_store_result(conn);
+	// // row = mysql_fetch_row(res);
+	// // if (row != NULL) {
+    // redisReply* res = (redisReply*)redisCommand(oj_rediscli, "get %d", solution_id);
+    // cJSON* root, *source_code;
+    // root = cJSON_Parse(res->str);
+    // source_code = cJSON_GetObjectItem(root, "source_code");
 	// 	// create the src file
-	// 	sprintf(src_pth, "data.in");
-	// 	FILE *fp_src = fopen(src_pth, "w");
-	// 	fprintf(fp_src, "%s", row[0]);
-	// 	fclose(fp_src);
+	// sprintf(src_pth, "data.in");
+	// FILE *fp_src = fopen(src_pth, "w");
+	// fprintf(fp_src, "%s", row[0]);
+	// fclose(fp_src);
     //
-	// }
-	// mysql_free_result(res);
+	// // }
+	// // mysql_free_result(res);
 }
 void get_custominput(int solution_id, char * work_dir) {
 	if (http_judge) {
@@ -1413,11 +1409,25 @@ void _get_solution_info_http(int solution_id, int & p_id, char * user_id,
 	pclose(pout);
 
 }
+//redis_code
 void _get_solution_info_redis(int solution_id, int & p_id, char * user_id,
 		int & lang) {
 
 	login();
+    redisReply* res = (redisReply*)redisCommand(oj_rediscli, "get %d", solution_id);
+    cJSON* root, *solution;
+    // printf("%s\n", res->str);
+    root = cJSON_Parse(res->str);
+    solution = cJSON_GetObjectItem(root, "solution");
+    // problem = cJSON_GetObjectItem(solution, "problem_id");
+    p_id = cJSON_GetObjectItem(solution, "problem_id")->valuedouble;
+    // p_id = problem->valuedouble;
 
+    strcpy(user_id, cJSON_GetObjectItem(solution, "user_id")->valuestring);
+    // lang = problem->valuedouble;
+    lang = cJSON_GetObjectItem(solution, "language")->valuedouble;
+    // printf("pid:%d\n", p_id);
+    cJSON_Delete(root);
 	// const char * cmd =
 	// 		"wget --post-data=\"getsolutioninfo=1&sid=%d\" --load-cookies=cookie --save-cookies=cookie --keep-session-cookies -q -O - \"%s/admin/problem_judge.php\"";
 	// FILE * pout = read_cmd_output(cmd, solution_id, http_baseurl);
@@ -1472,29 +1482,33 @@ void _get_problem_info_http(int p_id, int & time_lmt, int & mem_lmt,
 	fscanf(pout, "%d", &isspj);
 	pclose(pout);
 }
+//redis_code
 void _get_problem_info_redis(int p_id, int & time_lmt, int & mem_lmt,
-		int & isspj) {
-	// get the problem info from Table:problem
-	// char sql[BUFFER_SIZE];
-	// MYSQL_RES *res;
-	// MYSQL_ROW row;
-	// sprintf(sql,
-	// 		"SELECT time_limit,memory_limit,spj FROM problem where problem_id=%d",
-	// 		p_id);
-	// mysql_real_query(conn, sql, strlen(sql));
-	// res = mysql_store_result(conn);
-	// row = mysql_fetch_row(res);
-	// time_lmt = atoi(row[0]);
-	// mem_lmt = atoi(row[1]);
-	// isspj = (row[2][0] == '1');
-	// mysql_free_result(res);
+		int & isspj, int solution_id) {
+    // printf("here fuck\n");
+    redisReply* res = (redisReply*)redisCommand(oj_rediscli, "get %d", solution_id);
+    // printf("%s\n", res->str);
+    // return;
+    cJSON* root, *problem;
+    root = cJSON_Parse(res->str);
+    problem = cJSON_GetObjectItem(root, "problem");
+    printf("%f\n", cJSON_GetObjectItem(problem, "time_limit")->valuedouble);
+    time_lmt = (int)(cJSON_GetObjectItem(problem, "time_limit")->valuedouble);
+    mem_lmt = (int)(cJSON_GetObjectItem(problem, "memory_limit")->valuedouble);
+    isspj = cJSON_GetObjectItem(problem, "spj")->valuestring[0];
+    redisCommand(oj_rediscli, "set %d %s", solution_id ,cJSON_PrintUnformatted(root));
+    // printf("%s\n", cJSON_PrintUnformatted(root));
+
+    cJSON_Delete(root);
+
 }
-void get_problem_info(int p_id, int & time_lmt, int & mem_lmt, int & isspj) {
+void get_problem_info(int p_id, int & time_lmt, int & mem_lmt, int & isspj, int solution_id) {
 	if (http_judge) {
 		_get_problem_info_http(p_id, time_lmt, mem_lmt, isspj);
 	} else {
         if(oj_redis){
-            _get_problem_info_redis(p_id, time_lmt, mem_lmt, isspj);
+            // printf("hereea\n");
+            _get_problem_info_redis(p_id, time_lmt, mem_lmt, isspj, solution_id);
         }else{
             _get_problem_info_mysql(p_id, time_lmt, mem_lmt, isspj);
         }
@@ -2479,7 +2493,8 @@ int main(int argc, char** argv) {
 		mem_lmt = 128;
 		isspj = 0;
 	} else {
-		get_problem_info(p_id, time_lmt, mem_lmt, isspj);
+        // printf("here\n");
+		get_problem_info(p_id, time_lmt, mem_lmt, isspj, solution_id);
 	}
 	//copy source file
 
