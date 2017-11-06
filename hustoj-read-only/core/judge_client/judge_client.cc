@@ -639,13 +639,14 @@ void _update_solution_redis(int solution_id, int result, int time, int memory,
     cJSON_SetIntValue(cJSON_GetObjectItem(solution, "time"), time);
     cJSON_SetIntValue(cJSON_GetObjectItem(solution, "result"), result);
     cJSON_SetIntValue(cJSON_GetObjectItem(solution, "memory"), memory);
-    // cJSON_SetNumberValue(cJSON_GetObjectItem(solution, "pass_rate"), number)
     cJSON_GetObjectItem(solution, "pass_rate")->valuedouble = pass_rate;
-    // cJSON_SetIntValue(cJSON_GetObjectItem(solution, "pass_rate"), pass_rate);
-    strcpy(cJSON_GetObjectItem(solution, "judger")->valuestring, http_username);
+    cJSON_DeleteItemFromObject(solution, "judger");
+    cJSON_AddItemToObject(solution, "judger", cJSON_CreateString(http_username));
     redisCommand(oj_rediscli, "set %d %s", solution_id ,cJSON_PrintUnformatted(root));
+    if(oj_keeplive > 0)
+        redisCommand(oj_rediscli, "EXPIRE %d %d", solution_id, oj_keeplive);
     cJSON_Delete(root);
-    // printf("更新数据\n");
+    // printf("%s\n", __func__);
 
 
 }
@@ -732,7 +733,6 @@ char *url_encode(char *str) {
 //redis_code
 void _addceinfo_redis(int solution_id) {
 
-	// char sql[(1 << 16)], *end;
 	char ceinfo[(1 << 16)], *cend;
 	FILE *fp = fopen("ce.txt", "re");
 
@@ -743,14 +743,21 @@ void _addceinfo_redis(int solution_id) {
 			break;
 	}
     cend = 0;
-    printf("结果%s\n", ceinfo);
+    printf("res1%s\n", ceinfo);
     redisReply* res = (redisReply*)redisCommand(oj_rediscli, "get %d", solution_id);
     cJSON* root, *compileinfo;
     root = cJSON_Parse(res->str);
     compileinfo = cJSON_GetObjectItem(root, "compileinfo");
-    strcpy(cJSON_GetObjectItem(compileinfo, "error")->valuestring, ceinfo);
+    printf("res2%s\n", cJSON_GetObjectItem(compileinfo, "error")->valuestring);
+    cJSON_DeleteItemFromObject(compileinfo, "error");
+    cJSON_AddItemToObject(compileinfo, "error", cJSON_CreateString(ceinfo));
+    printf("res3%s\n", cJSON_GetObjectItem(compileinfo, "error")->valuestring);
+
     redisCommand(oj_rediscli, "set %d %s", solution_id ,cJSON_PrintUnformatted(root));
+    if(oj_keeplive > 0)
+        redisCommand(oj_rediscli, "EXPIRE %d %d", solution_id, oj_keeplive);
     cJSON_Delete(root);
+    // printf("%s\n", __func__);
 
 	fclose(fp);
 }
@@ -839,14 +846,17 @@ void _addreinfo_redis(int solution_id, const char * filename) {
 			break;
 	}
 	rend = 0;
-    printf("结果%s\n", reinfo);
     redisReply* res = (redisReply*)redisCommand(oj_rediscli, "get %d", solution_id);
     cJSON* root, *runtimeinfo;
     root = cJSON_Parse(res->str);
     runtimeinfo = cJSON_GetObjectItem(root, "runtimeinfo");
-    strcpy(cJSON_GetObjectItem(runtimeinfo, "error")->valuestring, reinfo);
+    cJSON_DeleteItemFromObject(runtimeinfo, "error");
+    cJSON_AddItemToObject(runtimeinfo, "error", cJSON_CreateString(reinfo));
     redisCommand(oj_rediscli, "set %d %s", solution_id ,cJSON_PrintUnformatted(root));
+    if(oj_keeplive > 0)
+        redisCommand(oj_rediscli, "EXPIRE %d %d", solution_id, oj_keeplive);
     cJSON_Delete(root);
+    // printf("%s\n", __func__);
 
 	fclose(fp);
 }
@@ -1338,7 +1348,7 @@ void _get_custominput_http(int solution_id, char * work_dir) {
 }
 //redis_code
 void _get_custominput_redis(int solution_id, char * work_dir) {
-	// char /*sql[BUFFER_SIZE], */src_pth[BUFFER_SIZE];
+	char /*sql[BUFFER_SIZE], */src_pth[BUFFER_SIZE];
 	// // get the source code
 	// // MYSQL_RES *res;
 	// // MYSQL_ROW row;
@@ -1353,10 +1363,10 @@ void _get_custominput_redis(int solution_id, char * work_dir) {
     // root = cJSON_Parse(res->str);
     // source_code = cJSON_GetObjectItem(root, "source_code");
 	// 	// create the src file
-	// sprintf(src_pth, "data.in");
-	// FILE *fp_src = fopen(src_pth, "w");
+	sprintf(src_pth, "data.in");
+	FILE *fp_src = fopen(src_pth, "w");
 	// fprintf(fp_src, "%s", row[0]);
-	// fclose(fp_src);
+	fclose(fp_src);
     //
 	// // }
 	// // mysql_free_result(res);
@@ -1413,28 +1423,18 @@ void _get_solution_info_http(int solution_id, int & p_id, char * user_id,
 void _get_solution_info_redis(int solution_id, int & p_id, char * user_id,
 		int & lang) {
 
-	login();
+	// login();
     redisReply* res = (redisReply*)redisCommand(oj_rediscli, "get %d", solution_id);
     cJSON* root, *solution;
-    // printf("%s\n", res->str);
     root = cJSON_Parse(res->str);
     solution = cJSON_GetObjectItem(root, "solution");
-    // problem = cJSON_GetObjectItem(solution, "problem_id");
     p_id = cJSON_GetObjectItem(solution, "problem_id")->valuedouble;
-    // p_id = problem->valuedouble;
 
     strcpy(user_id, cJSON_GetObjectItem(solution, "user_id")->valuestring);
-    // lang = problem->valuedouble;
     lang = cJSON_GetObjectItem(solution, "language")->valuedouble;
-    // printf("pid:%d\n", p_id);
+
     cJSON_Delete(root);
-	// const char * cmd =
-	// 		"wget --post-data=\"getsolutioninfo=1&sid=%d\" --load-cookies=cookie --save-cookies=cookie --keep-session-cookies -q -O - \"%s/admin/problem_judge.php\"";
-	// FILE * pout = read_cmd_output(cmd, solution_id, http_baseurl);
-	// fscanf(pout, "%d", &p_id);
-	// fscanf(pout, "%s", user_id);
-	// fscanf(pout, "%d", &lang);
-	// pclose(pout);
+
 
 }
 void get_solution_info(int solution_id, int & p_id, char * user_id,
@@ -1485,19 +1485,19 @@ void _get_problem_info_http(int p_id, int & time_lmt, int & mem_lmt,
 //redis_code
 void _get_problem_info_redis(int p_id, int & time_lmt, int & mem_lmt,
 		int & isspj, int solution_id) {
-    // printf("here fuck\n");
+
     redisReply* res = (redisReply*)redisCommand(oj_rediscli, "get %d", solution_id);
-    // printf("%s\n", res->str);
-    // return;
+
     cJSON* root, *problem;
     root = cJSON_Parse(res->str);
     problem = cJSON_GetObjectItem(root, "problem");
-    printf("%f\n", cJSON_GetObjectItem(problem, "time_limit")->valuedouble);
     time_lmt = (int)(cJSON_GetObjectItem(problem, "time_limit")->valuedouble);
     mem_lmt = (int)(cJSON_GetObjectItem(problem, "memory_limit")->valuedouble);
     isspj = cJSON_GetObjectItem(problem, "spj")->valuestring[0];
     redisCommand(oj_rediscli, "set %d %s", solution_id ,cJSON_PrintUnformatted(root));
-    // printf("%s\n", cJSON_PrintUnformatted(root));
+    if(oj_keeplive > 0)
+        redisCommand(oj_rediscli, "EXPIRE %d %d", solution_id, oj_keeplive);
+    // printf("%s\n", __func__);
 
     cJSON_Delete(root);
 
