@@ -43,5 +43,6 @@ oj-by-redis是遵从GPL协议的软件
     OJ_CLI_REDISPORT=6379               //端口
     OJ_CLI_REDISAUTH=123456             //
     OJ_CLI_REDISQNAME=res               //库
+<p>其余配置信息参考<a href="https://github.com/zhblue/hustoj">hustoj</a></p>
 
 # 开发中。。。
