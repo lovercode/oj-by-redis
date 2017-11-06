@@ -3,7 +3,7 @@
 
 oj-by-redis是遵从GPL协议的软件
 
-首先感谢<a href="https://github.com/zhblue">zhblue</a>大佬开源项目<a href="https://github.com/zhblue/hustoj">hustoj</a>，本项目来源于hustoj，为适应学校考试系统，去掉了hustoj的web方面的代码，客户端增加使用<a href="https://github.com/antirez/redis">redis</a>做缓存，同时兼容原有的数据库保存，此项目只保留了最核心的在线编译部分的代码，其余代码请在原项目中hustoj
+首先感谢<a href="https://github.com/zhblue">zhblue</a>大佬开源项目<a href="https://github.com/zhblue/hustoj">hustoj</a>，本项目来源于hustoj，为适应学校考试系统，去掉了hustoj的web方面的代码，客户端增加使用<a href="https://github.com/antirez/redis">redis</a>做缓存，同时兼容原有的数据库保存，此项目只保留了最核心的在线编译部分的代码，其余代码在原项目hustoj中
 
 #### 每道题在redis中的数据结构
     {
