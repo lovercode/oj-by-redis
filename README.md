@@ -72,3 +72,14 @@ oj-by-redis是遵从GPL协议的软件
     此时，守护进程会获取所有待编译的solution_id，并且判题会根据此solution_id去找到
     上面的数据结构，然后编译。结果在result中，与hustoj基本一致，编译错误或运行结果
     在runtimeinfo.error或者compileinfo.error中
+
+### 安装
+    cp judge.conf /home/judge/etc
+    cd hustoj-read-only/core
+    cd judged
+    make
+    cp judged /usr/bin
+    cd ..
+    cd judge_client
+    make
+    cp judge_client /usr/bin
