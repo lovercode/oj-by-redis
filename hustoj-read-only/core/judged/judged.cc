@@ -582,7 +582,7 @@ int main(int argc, char** argv) {
 	sprintf(lock_file,"%s/etc/judge.pid",oj_home);
 	if (!DEBUG)
     //守护进程模式运行
-		daemon_init();
+		// daemon_init();
 	if ( already_running()) {
 		syslog(LOG_ERR | LOG_DAEMON,
 				"This daemon program is already running!\n");
