@@ -10,29 +10,39 @@ oj-by-redis是遵从GPL协议的软件
     	"solution":	{
     		"time":	0,
     		"judger":	"user",
-    		"pass_rate":	0.8,                  //通过率
-    		"language":	0,                     //语言
-    		"result":	0,                       //结果code
-    		"memory":	0,                       //耗费的内存
+            //通过率
+    		"pass_rate":	0.8,               
+            //语言   
+    		"language":	0,                     
+            //结果code
+    		"result":	0,          
+            //耗费的内存             
+    		"memory":	0,                       
     		"user_id":	"user",                  
-    		"problem_id":	14954345,           
-    		"solution_id":	12345               //与redis的key一样
+    		"problem_id":	14954345,    
+            //与redis的key一样       
+    		"solution_id":	12345               
     	},
     	"source_code":	{
-    		"source":	"#include <stdio.h>"     //源码
+            //源码
+    		"source":	"#include <stdio.h>"     
     	},
     	"runtimeinfo":	{
-    		"error":	"error"                   //运行结果
+            //运行结果
+    		"error":	"error"                   
     	},
     	"compileinfo":	{
-    		"error":	"error"                   //编译错误
+            //编译错误
+    		"error":	"error"                   
     	},
     	"problem":	{
     		"problem_id":	14954345,
     		"title":	"title",
     		"spj":	"a",
-    		"time_limit":	1,                    //运行时间限制
-    		"memory_limit":	1                   //运行内存限制
+            //运行时间限制
+    		"time_limit":	1,               
+            //运行内存限制     
+    		"memory_limit":	1                   
     	}
     }
 
