@@ -22,6 +22,7 @@ oj-by-redis是遵从GPL协议的软件
     		"source":	"#include <stdio.h>"
     	},
     	"runtimeinfo":	{
+    		"error":	"error"
     	},
     	"compileinfo":	{
     		"error":	"error"
