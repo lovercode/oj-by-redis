@@ -35,4 +35,13 @@ oj-by-redis是遵从GPL协议的软件
     		"memory_limit":	1
     	}
     }
+
+
+#### judge.conf新增内容
+    OJ_CLI_REDISENABLE=1                //编译客户端是否开启redis
+    OJ_CLI_REDISSERVER=127.0.0.1        //redis服务器
+    OJ_CLI_REDISPORT=6379               //端口
+    OJ_CLI_REDISAUTH=123456             //
+    OJ_CLI_REDISQNAME=res               //库
+
 # 开发中。。。
